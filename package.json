@@ -9,5 +9,9 @@
   "dependencies": {
     "hoist-non-react-statics": "^3.3.0",
     "react": "^16.11.0"
+  },
+  "devDependencies": {
+    "@types/react": "^16.9.11",
+    "typescript": "^3.6.4"
   }
 }
