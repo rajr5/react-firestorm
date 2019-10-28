@@ -6,12 +6,67 @@
   "repository": "https://github.com/joshgachnang/FireStorm.git",
   "author": "Josh Gachnang <josh@nang.io>",
   "license": "MIT",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "lint": "./node_modules/.bin/eslint --fix \"src/**/*.ts*\"",
+    "test": "yarn lint"
+  },
   "dependencies": {
+    "@types/hoist-non-react-statics": "^3.3.1",
     "hoist-non-react-statics": "^3.3.0",
     "react": "^16.11.0"
   },
   "devDependencies": {
     "@types/react": "^16.9.11",
+    "@typescript-eslint/eslint-plugin": "^1.6.0",
+    "@typescript-eslint/parser": "^1.6.0",
+    "eslint": "^5.13.0",
+    "eslint-config-airbnb": "^17.1.1",
+    "eslint-config-prettier": "^4.1.0",
+    "eslint-plugin-import": "^2.18.0",
+    "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-prettier": "^3.0.1",
+    "eslint-plugin-react": "^7.12.4",
+    "eslint-plugin-react-native": "^3.7.0",
+    "prettier": "^1.18.2",
+    "tslint": "5.10.0",
     "typescript": "^3.6.4"
+  },
+  "eslintConfig": {
+    "parser": "@typescript-eslint/parser",
+    "extends": [
+      "plugin:react/recommended",
+      "plugin:@typescript-eslint/recommended",
+      "prettier/@typescript-eslint",
+      "plugin:prettier/recommended"
+    ],
+    "parserOptions": {
+      "ecmaVersion": 2018,
+      "sourceType": "module",
+      "ecmaFeatures": {
+        "jsx": true
+      }
+    },
+    "settings": {
+      "react": {
+        "version": "16.8.3"
+      }
+    },
+    "rules": {
+      "@typescript-eslint/explicit-member-accessibility": "off",
+      "@typescript-eslint/explicit-function-return-type": "off",
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/interface-name-prefix": "off"
+    }
+  },
+  "prettier": {
+    "arrowParens": "always",
+    "bracketSpacing": false,
+    "printWidth": 100,
+    "semi": true,
+    "singleQuote": false,
+    "trailingComma": "es5",
+    "useTabs": false
   }
 }
