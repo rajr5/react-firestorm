@@ -2,7 +2,7 @@
   "name": "react-firestorm",
   "version": "0.1.0",
   "description": "A Firebase FireStore ORM for React",
-  "main": "index.js",
+  "main": "dist/index.js",
   "repository": "https://github.com/joshgachnang/FireStorm.git",
   "author": "Josh Gachnang <josh@nang.io>",
   "license": "MIT",
