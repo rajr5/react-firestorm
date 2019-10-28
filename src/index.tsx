@@ -1,3 +1,6 @@
+import React from "react";
+import hoist from "hoist-non-react-statics";
+
 interface DocumentSnapshot {
   exists: any;
   data: any;
@@ -348,3 +351,155 @@ class FirestormService {
 }
 
 export const FireStorm = new FirestormService();
+
+interface FirestoreModelState {
+  data: any;
+}
+
+// type Optionalize<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>> & Partial<Pick<T, K>>;
+
+export interface ModelProps<T> {
+  save: (document: T) => Promise<T>;
+  delete: (document: T) => Promise<void>;
+  update: (document: T) => Promise<void>;
+  doc?: T;
+  docs?: T[];
+}
+
+export const FireStormModel = (
+  attachName: string,
+  configCallback: (profile?: FireStormProfile) => ListenerConfig | undefined,
+  extraProps: {[prop: string]: any} = {}
+) => <T extends {}>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
+  // console.log("FIRESTORM MODEL", config);
+  // export function FirestoreModel<T extends FirestoreModelProps = FirestoreModelProps>(
+  //   WrappedComponent: React.ComponentType<T>
+  // ) {
+  // Try to create a nice displayName for React Dev Tools.
+  const displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
+
+  // Creating the inner component. The calculated Props type here is the where the magic happens. (??)
+  class FirestoreModelHOC extends React.PureComponent<T, FirestoreModelState> {
+    listener: any;
+    config: ListenerConfig | undefined;
+    constructor(props: T) {
+      super(props);
+      this.state = {data: undefined};
+    }
+
+    async componentDidMount() {
+      const listen = async (profile: FireStormProfile) => {
+        this.config = configCallback(profile);
+        console.log("CONFIG", this.config);
+        if (!this.config) {
+          this.setState({data: undefined});
+          return;
+        }
+        this.listener = await FireStorm.addListener(this.config, (data) => {
+          // console.log("[firestore] HOC LISTENER", this.config && this.config.collection, data);
+          this.setState({data});
+        });
+      };
+      const profile = FireStorm.getUser();
+
+      if (!profile) {
+        FireStorm.onProfileStateChanged(listen);
+      } else {
+        listen(profile);
+      }
+    }
+
+    componentWillUnmount() {
+      // console.log("[firestore] MODEL WILL UNMOUNT", config.collection, this.listener);
+      // Unmount the listener
+      console.log("[firestore] Removing listener", this.config);
+      this.listener && this.listener();
+    }
+
+    public static displayName = `firestoreModel(${displayName})`;
+
+    public render() {
+      // console.log("[firestore] model render");
+      if (!this.config) {
+        return <WrappedComponent {...(this.props as any)} {...{[attachName]: {...extraProps}}} />;
+      }
+      const config = this.config;
+
+      let firestormProps: ModelProps<T> = {
+        save: (document) => FireStorm.saveDocument(config.collection, document),
+        update: (partial) => FireStorm.updateDocument(config.collection, partial),
+        // TODO: the generic should be generic, with these required props
+        delete: (document: any) => FireStorm.deleteDocument(config.collection, document.id),
+        ...extraProps,
+        // TODO pagination, get, read, etc
+      };
+      if (config.attach) {
+        firestormProps = {...firestormProps, ...config.attach(this.state.data)};
+      } else if (config.id) {
+        firestormProps.doc = this.state.data;
+      } else {
+        firestormProps.docs = this.state.data;
+      }
+      return <WrappedComponent {...(this.props as any)} {...{[attachName]: firestormProps}} />;
+    }
+  }
+  // TODO not sure why hoist was messing with the props here.
+  return (hoist(FirestoreModelHOC, WrappedComponent as any) as unknown) as React.ComponentType<T>;
+};
+
+type Omit<T, K extends keyof any> = T extends any ? Pick<T, Exclude<keyof T, K>> : never;
+
+interface WithProfile extends ModelProps<FireStormProfile> {
+  isAdmin: () => boolean;
+  isAuthenticated: () => boolean;
+  isOwner: (item: {ownerId?: string}) => boolean;
+  updateProfile: (update: Partial<FireStormProfile>) => void;
+}
+export interface WithProfileProps {
+  profile: WithProfile;
+}
+
+export const withProfile = <T extends {}>(
+  WrappedComponent: React.ComponentType<T>
+): React.ComponentType<Omit<T, keyof WithProfileProps>> => {
+  return (FireStormModel(
+    "profile",
+    (profile) =>
+      profile
+        ? {
+            collection: PROFILE_COLLECTION,
+            id: profile.id,
+          }
+        : undefined,
+    {
+      isAdmin: () => {
+        const user = FireStorm.getUser();
+        return user && user.admin;
+      },
+      isAuthenticated: () => Boolean(FireStorm.getUser()),
+      isOwner: (item: {ownerId?: string}) => {
+        const user = FireStorm.getUser();
+        return user && item && item.ownerId && user.id === item.ownerId;
+      },
+      updateProfile: (update: any) => FireStorm.updateProfile(update),
+    }
+  )(WrappedComponent) as unknown) as React.ComponentType<Omit<T, keyof WithProfileProps>>;
+};
+
+// Maybe should be default?
+export const withFirestore = (WrappedComponent: React.ComponentType<any>) => {
+  return class withFirestoreClass extends React.Component {
+    static wrappedComponent = WrappedComponent;
+    static displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
+
+    render() {
+      return (
+        <WrappedComponent
+          {...this.props}
+          firestore={FireStorm.firestore}
+          firebase={FireStorm.firebase}
+        />
+      );
+    }
+  };
+};
