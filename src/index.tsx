@@ -11,9 +11,9 @@ try {
   pkg = require("../package.json");
 } catch (e) {}
 
-let randomString = function(length: number) {
+const randomString = function(length: number) {
   let text = "";
-  let possible = "abcdefghijklmnopqrstuvwxyz0123456789";
+  const possible = "abcdefghijklmnopqrstuvwxyz0123456789";
   for (let i = 0; i < length; i++) {
     text += possible.charAt(Math.floor(Math.random() * possible.length));
   }
@@ -699,7 +699,7 @@ export const FireStormModel = (
   attachName: string,
   configCallback: (profile?: FireStormProfile) => ListenerConfig | undefined,
   extraProps: {[prop: string]: any} = {}
-) => <T extends {}>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
+) => <T extends unknown>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
   // console.log("FIRESTORM MODEL", config);
   // export function FirestoreModel<T extends FirestoreModelProps = FirestoreModelProps>(
   //   WrappedComponent: React.ComponentType<T>
@@ -828,7 +828,7 @@ export interface WithProfileProps {
   profile: WithProfile<Profile>;
 }
 
-export const withProfile = <T extends {}>(
+export const withProfile = <T extends unknown>(
   WrappedComponent: React.ComponentType<T>
 ): React.ComponentType<Omit<T, keyof WithProfileProps>> => {
   const HOC = (FireStormModel(
@@ -863,7 +863,7 @@ export const FireStormHOC = (
   Model: FireStormDocument,
   configCallback: (profile?: FireStormProfile) => ListenerConfig,
   extraProps: {[prop: string]: any} = {}
-) => <T extends {}>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
+) => <T extends unknown>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
   // Try to create a nice displayName for React Dev Tools.
   const displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
 
@@ -929,7 +929,7 @@ export const FireStormHOC = (
         data = new (Model as any)(data);
       } else {
         data = [];
-        for (let id of Object.keys(this.state.data)) {
+        for (const id of Object.keys(this.state.data)) {
           data.push(new (Model as any)(this.state.data[id]));
         }
       }
@@ -947,11 +947,11 @@ export type FireStormSchemaField =
   | typeof Array
   | typeof Date
   | typeof Object;
-export type FireStormSchemaComplexField = {
+export interface FireStormSchemaComplexField {
   required?: boolean;
   type: FireStormSchemaField;
   validate?: (key: string, value: any) => boolean;
-};
+}
 
 export interface FireStormSchemaConfig {
   [name: string]: FireStormSchemaField;
@@ -1076,10 +1076,10 @@ export class FireStormDocument {
     this._methods = schema._methods;
     this._firestorm = schema.firestorm || FireStorm;
 
-    for (let methodName of Object.keys(schema._methods)) {
+    for (const methodName of Object.keys(schema._methods)) {
       this[methodName] = schema._methods[methodName].bind(this);
     }
-    for (let key of Object.keys(data)) {
+    for (const key of Object.keys(data)) {
       if (!schema.isKey(key)) {
         throw new Error(`${key} is not part of the ${name} schema.`);
       }
@@ -1094,7 +1094,7 @@ export class FireStormDocument {
   }
 
   async validate() {
-    for (let key of Object.keys(this._schema.config)) {
+    for (const key of Object.keys(this._schema.config)) {
       this._schema.validate(key, this[key]);
     }
   }
@@ -1103,7 +1103,7 @@ export class FireStormDocument {
     await this.validate();
 
     const data = {id: this.id};
-    for (let key of Object.keys(this._schema.config)) {
+    for (const key of Object.keys(this._schema.config)) {
       data[key] = _.cloneDeep(this[key]);
     }
     await this._firestorm.saveDocument(this._schema.collection, data);
@@ -1114,7 +1114,7 @@ export class FireStormDocument {
   }
 
   async update(partialUpdate: any) {
-    for (let key of Object.keys(partialUpdate)) {
+    for (const key of Object.keys(partialUpdate)) {
       this[key] = partialUpdate[key];
     }
     await this.validate();

@@ -1,5 +1,5 @@
 import {assert} from "chai";
-import {FireStorm, FireStormSchema, registerSchema} from "./index";
+import {FireStormSchema, registerSchema} from "./index";
 import "mocha";
 import nativeAssert from "assert";
 import sinon from "sinon";
@@ -36,7 +36,7 @@ describe("FireStormSchema", function() {
       date: new Date("2020-01-01"),
     });
 
-    let n = m as any;
+    const n = m as any;
     assert.equal(n.string, "test");
     assert.equal(n.number, 1);
     assert.equal(n.boolean, true);
@@ -166,7 +166,7 @@ describe("FireStormSchema", function() {
       fsMock
     );
     const Model = registerSchema("Model", schema);
-    let m = new Model({field: 1});
+    const m = new Model({field: 1});
     await m.save();
 
     assert.equal((m as any).field, 1);
@@ -183,7 +183,7 @@ describe("FireStormSchema", function() {
       fsMock
     );
     const Model = registerSchema("Model", schema);
-    let m = new Model({field: 1});
+    const m = new Model({field: 1});
     await m.save();
     await m.update({field: 2});
 
@@ -201,7 +201,7 @@ describe("FireStormSchema", function() {
       fsMock
     );
     const Model = registerSchema("Model", schema);
-    let m = new Model({field: 1});
+    const m = new Model({field: 1});
     await m.save();
 
     (m as any).field = "two";
