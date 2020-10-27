@@ -1,6 +1,8 @@
-name: "Test workflow"
-on: [push]
-
+name: "Publish workflow"
+on:
+  push:
+    branches:
+      - master # Change this to your default branch
 jobs:
   build:
     name: Debug
