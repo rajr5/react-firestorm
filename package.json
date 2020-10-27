@@ -1,6 +1,6 @@
 {
   "name": "react-firestorm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A Firebase FireStore ORM for React",
   "main": "dist/index.js",
   "repository": "https://github.com/joshgachnang/FireStorm.git",
@@ -9,35 +9,50 @@
   "scripts": {
     "build": "tsc",
     "dev": "tsc -w",
-    "lint": "./node_modules/.bin/eslint --fix \"src/**/*.ts*\"",
+    "lint": "eslint 'src/**/*.{js,ts,tsx}' --fix",
+    "run-tests": "ts-mocha src/*.test.ts*",
     "test": "yarn lint",
     "deploy": "yarn build && npm publish"
   },
   "dependencies": {
     "@firebase/app": "^0.6.5",
     "@types/hoist-non-react-statics": "^3.3.1",
+    "@types/lodash": "^4.14.162",
     "axios": "^0.19.2",
     "firebase": "^7.15.1",
     "hoist-non-react-statics": "^3.3.0",
+    "lodash": "^4.17.20",
     "react": "^16.11.0"
   },
   "devDependencies": {
     "@firebase/firestore-types": "^1.11.0",
+    "@react-native-community/eslint-config": "^0.0.5",
+    "@types/chai": "^4.2.14",
+    "@types/mocha": "^8.0.3",
     "@types/node": "^14.0.13",
     "@types/react": "^16.9.11",
-    "@typescript-eslint/eslint-plugin": "^1.6.0",
-    "@typescript-eslint/parser": "^1.6.0",
-    "eslint": "^5.13.0",
-    "eslint-config-airbnb": "^17.1.1",
+    "@types/sinon": "^9.0.8",
+    "@typescript-eslint/eslint-plugin": "^4.6.0",
+    "@typescript-eslint/parser": "^4.6.0",
+    "awesome-typescript-loader": "^5.2.1",
+    "babel-eslint": "10.1.0",
+    "chai": "^4.2.0",
+    "concurrently": "^5.3.0",
+    "eslint": "^7.12.1",
+    "eslint-config-airbnb": "^16.1.0",
     "eslint-config-prettier": "^4.1.0",
+    "eslint-loader": "^3.0.0",
     "eslint-plugin-import": "^2.18.0",
     "eslint-plugin-jsx-a11y": "^6.2.3",
+    "eslint-plugin-lodash": "^7.1.0",
     "eslint-plugin-prettier": "^3.0.1",
     "eslint-plugin-react": "^7.12.4",
-    "eslint-plugin-react-native": "^3.7.0",
-    "prettier": "^1.18.2",
+    "mocha": "^8.2.0",
+    "prettier": "^1.19.1",
+    "sinon": "^9.2.0",
+    "ts-mocha": "^8.0.0",
     "tslint": "5.10.0",
-    "typescript": "^3.6.4"
+    "typescript": "^3.9.0"
   },
   "eslintConfig": {
     "parser": "@typescript-eslint/parser",
@@ -48,7 +63,7 @@
       "plugin:prettier/recommended"
     ],
     "parserOptions": {
-      "ecmaVersion": 2018,
+      "ecmaVersion": 2020,
       "sourceType": "module",
       "ecmaFeatures": {
         "jsx": true
@@ -56,14 +71,15 @@
     },
     "settings": {
       "react": {
-        "version": "16.8.3"
+        "version": "detect"
       }
     },
     "rules": {
       "@typescript-eslint/explicit-member-accessibility": "off",
       "@typescript-eslint/explicit-function-return-type": "off",
       "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/interface-name-prefix": "off"
+      "@typescript-eslint/interface-name-prefix": "off",
+      "@typescript-eslint/explicit-module-boundary-types": "off"
     }
   },
   "prettier": {
