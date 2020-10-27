@@ -1,6 +1,6 @@
 {
   "name": "react-firestorm",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "A Firebase FireStore ORM for React",
   "main": "dist/index.js",
   "repository": "https://github.com/joshgachnang/FireStorm.git",
