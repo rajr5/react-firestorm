@@ -3,12 +3,26 @@ import axios from "axios";
 import * as firebase from "firebase/app";
 import hoist from "hoist-non-react-statics";
 import * as React from "react";
+import _ from "lodash";
 
 let pkg: any;
 try {
   // eslint-disable-next-line @typescript-eslint/no-var-requires
   pkg = require("../package.json");
 } catch (e) {}
+
+let randomString = function(length: number) {
+  let text = "";
+  let possible = "abcdefghijklmnopqrstuvwxyz0123456789";
+  for (let i = 0; i < length; i++) {
+    text += possible.charAt(Math.floor(Math.random() * possible.length));
+  }
+  return text;
+};
+
+function getNewId() {
+  return randomString(16);
+}
 
 type Profile = any;
 let isProduction = true;
@@ -98,7 +112,6 @@ function extractDocs(snap: QuerySnapshot) {
 
 class FirestormService<T extends FireStormProfile = FireStormProfile> {
   baseUrl?: string;
-
   _firebase: firebase.app.App | undefined;
   get firebase(): firebase.app.App {
     if (!this._firebase) {
@@ -492,7 +505,7 @@ class FirestormService<T extends FireStormProfile = FireStormProfile> {
     }
     if (!document.id) {
       console.warn(`Tried to save document without id to collection: ${collection}`, document);
-      return;
+      throw new Error(`Tried to save document without id to collection: ${collection}`);
     }
     let doc;
     try {
@@ -575,14 +588,12 @@ class FirestormService<T extends FireStormProfile = FireStormProfile> {
             }
           );
         }
-        console.log("FETCH", PROFILE_COLLECTION, user.uid);
         let profileDoc;
         try {
           profileDoc = (await this.getDocument(PROFILE_COLLECTION, user.uid)) as T;
         } catch (e) {
           console.error("[FireStorm] Error fetching profile doc", user.uid);
         }
-        console.log("PROFILE DOC", profileDoc);
         if (profileDoc) {
           this.profile = profileDoc;
           console.debug("[FireStorm] Found user profile", profileDoc);
@@ -846,3 +857,268 @@ export const withProfile = <T extends {}>(
   )(WrappedComponent) as unknown) as React.ComponentType<Omit<T, keyof WithProfileProps>>;
   return HOC;
 };
+
+export const FireStormHOC = (
+  attachName: string,
+  Model: FireStormDocument,
+  configCallback: (profile?: FireStormProfile) => ListenerConfig,
+  extraProps: {[prop: string]: any} = {}
+) => <T extends {}>(WrappedComponent: React.ComponentType<T>): React.ComponentType<T> => {
+  // Try to create a nice displayName for React Dev Tools.
+  const displayName = WrappedComponent.displayName || WrappedComponent.name || "Component";
+
+  // Creating the inner component. The calculated Props type here is the where the magic happens.
+  class FireStormModelHOC extends React.Component<T, FirestoreModelState> {
+    listener: any;
+    profileListener: any;
+    config: ListenerConfig | undefined;
+    onceComplete = false;
+
+    public static displayName = `FireStormHOC(${displayName})`;
+
+    constructor(props: T) {
+      super(props);
+      this.state = {data: undefined};
+    }
+
+    async componentDidMount() {
+      const profile = FireStorm.getUser();
+      FireStorm.onProfileStateChanged(this.setUpListeners);
+
+      if (profile) {
+        this.setUpListeners(profile);
+      } else {
+        console.warn("No profile, cannot set up FireStormHOC");
+      }
+    }
+
+    componentWillUnmount() {
+      this.removeListeners();
+    }
+
+    onListenerCallback = (data: any) => {
+      if (!this.listener) {
+        return;
+      }
+      if (this.config?.once) {
+        if (this.onceComplete) {
+          return;
+        }
+        this.onceComplete = true;
+      }
+      this.setState({data});
+    };
+
+    setUpListeners = async (profile: FireStormProfile) => {
+      this.config = configCallback(profile);
+      this.listener = await FireStorm.addListener(this.config, (data) => this.setState({data}));
+    };
+
+    removeListeners = () => {
+      this.listener && this.listener();
+      this.profileListener && this.profileListener();
+    };
+
+    public render() {
+      const props = this.props as any;
+
+      let data;
+      if (!this.config) {
+        data = {};
+      } else if (this.config.id) {
+        data = new (Model as any)(data);
+      } else {
+        data = [];
+        for (let id of Object.keys(this.state.data)) {
+          data.push(new (Model as any)(this.state.data[id]));
+        }
+      }
+
+      return <WrappedComponent {...props} {...{[attachName]: data}} {...extraProps} />;
+    }
+  }
+  return hoist(FireStormModelHOC, WrappedComponent);
+};
+
+export type FireStormSchemaField =
+  | typeof String
+  | typeof Number
+  | typeof Boolean
+  | typeof Array
+  | typeof Date
+  | typeof Object;
+export type FireStormSchemaComplexField = {
+  required?: boolean;
+  type: FireStormSchemaField;
+  validate?: (key: string, value: any) => boolean;
+};
+
+export interface FireStormSchemaConfig {
+  [name: string]: FireStormSchemaField;
+}
+
+function isComplexField(
+  value: FireStormSchemaComplexField | FireStormSchemaField
+): value is FireStormSchemaComplexField {
+  return (value as any).type;
+}
+
+type FireStormSchemaStatic = () => void;
+type FireStormInstanceMethod = () => void;
+
+export class FireStormSchema {
+  collection: string;
+  config: FireStormSchemaConfig;
+  _statics: {[name: string]: FireStormSchemaStatic} = {};
+  _methods: {[name: string]: FireStormInstanceMethod} = {};
+  // Optionally set this for tests.
+  firestorm?: FirestormService;
+
+  constructor(collection: string, config: FireStormSchemaConfig, firestorm?: FirestormService) {
+    this.collection = collection;
+    this.config = config;
+    this.firestorm = firestorm;
+  }
+
+  static(name: string, fn: () => void) {
+    this._statics[name] = fn.bind(this);
+    this[name] = fn.bind(this);
+  }
+
+  method(name: string, fn: () => void) {
+    this._methods[name] = fn.bind(this);
+  }
+
+  isKey(key: string): boolean {
+    return Boolean(this.config[key]);
+  }
+
+  validate(key: string, value: any) {
+    const name = this.config.name;
+
+    if (!this.isKey(key)) {
+      throw new Error(`ValidationFailed(${name}): ${key} is not part of the  schema.`);
+    }
+
+    let valueType: FireStormSchemaField;
+    const config = this.config[key];
+    if (isComplexField(config)) {
+      valueType = config.type;
+
+      if ((config.required === true && value === undefined) || value === null) {
+        throw new Error(`ValidationFailed(${name}): ${key} is required`);
+      }
+      if (config.validate) {
+        config.validate(key, value);
+      }
+    } else {
+      valueType = config;
+    }
+
+    switch (valueType) {
+      case String:
+        if (!_.isString(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not a string, value: ${value}`);
+        }
+        break;
+      case Number:
+        if (!_.isNumber(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not a number, value: ${value}`);
+        }
+        break;
+      case Boolean:
+        if (!_.isBoolean(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not a boolean, value: ${value}`);
+        }
+        break;
+      case Array:
+        if (!_.isArray(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not an array, value: ${value}`);
+        }
+        break;
+      case Date:
+        if (!_.isDate(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not a date, value: ${value}`);
+        }
+        break;
+      case Object:
+        if (!_.isObject(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is not an object, value: ${value}`);
+        }
+        if (_.isArray(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is an array, not an object: ${value}`);
+        }
+        if (_.isDate(value)) {
+          throw new Error(`ValidationFailed(${name}): ${key} is a date, not an object: ${value}`);
+        }
+        break;
+      default:
+        throw new Error(`ValidationFailed(${name}): unkonwn value type ${valueType}`);
+    }
+  }
+}
+
+export function registerSchema(name: string, schema: FireStormSchema) {
+  return FireStormDocument.bind(null, name, schema);
+}
+
+// TODO: support versioning a la Mongoose
+export class FireStormDocument {
+  id: string;
+  _name: string;
+  _schema: FireStormSchema;
+  _methods: {[name: string]: FireStormInstanceMethod};
+  _firestorm: FirestormService;
+
+  constructor(name: string, schema: FireStormSchema, data?: any) {
+    this._name = name;
+    this._schema = schema;
+    this._methods = schema._methods;
+    this._firestorm = schema.firestorm || FireStorm;
+
+    for (let methodName of Object.keys(schema._methods)) {
+      this[methodName] = schema._methods[methodName].bind(this);
+    }
+    for (let key of Object.keys(data)) {
+      if (!schema.isKey(key)) {
+        throw new Error(`${key} is not part of the ${name} schema.`);
+      }
+      this[key] = data[key];
+    }
+
+    if (!data.id) {
+      this.id = getNewId();
+    } else {
+      this.id = data.id;
+    }
+  }
+
+  async validate() {
+    for (let key of Object.keys(this._schema.config)) {
+      this._schema.validate(key, this[key]);
+    }
+  }
+
+  async save() {
+    await this.validate();
+
+    const data = {id: this.id};
+    for (let key of Object.keys(this._schema.config)) {
+      data[key] = _.cloneDeep(this[key]);
+    }
+    await this._firestorm.saveDocument(this._schema.collection, data);
+  }
+
+  async delete() {
+    await this._firestorm.deleteDocument(this._schema.collection, this.id);
+  }
+
+  async update(partialUpdate: any) {
+    for (let key of Object.keys(partialUpdate)) {
+      this[key] = partialUpdate[key];
+    }
+    await this.validate();
+    await this._firestorm.updateDocument(this._schema.collection, this.id, partialUpdate);
+    // TODO should roll the doc back on failure.
+  }
+}
